@@ -1,0 +1,18 @@
+{
+  "name": "rcli-android-arm64",
+  "version": "0.0.0",
+  "os": [
+    "android"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "main": "rcli.android-arm64.node",
+  "files": [
+    "rcli.android-arm64.node"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">= 10"
+  }
+}

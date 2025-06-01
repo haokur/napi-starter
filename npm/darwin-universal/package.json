@@ -1,0 +1,15 @@
+{
+  "name": "rcli-darwin-universal",
+  "version": "0.0.0",
+  "os": [
+    "darwin"
+  ],
+  "main": "rcli.darwin-universal.node",
+  "files": [
+    "rcli.darwin-universal.node"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">= 10"
+  }
+}
