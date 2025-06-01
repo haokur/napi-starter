@@ -55,7 +55,7 @@ fn test_search() -> tantivy::Result<()> {
 
   let searcher = reader.searcher();
   let query_parser = QueryParser::for_index(&index, vec![title, body]);
-  let query = query_parser.parse_query("sea whale")?;
+  let query = query_parser.parse_query("Soledad")?;
   let top_docs = searcher.search(&query, &TopDocs::with_limit(10))?;
 
   for (score, doc_address) in top_docs {

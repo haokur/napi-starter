@@ -1,203 +1,119 @@
 use napi::bindgen_prelude::*;
-use tantivy::collector::TopDocs;
-use tantivy::query::QueryParser;
-use tantivy::schema::{Document, SchemaBuilder, STORED, TEXT};
-use tantivy::{doc, Index, TantivyDocument};
+use napi_derive::napi;
+use tantivy::{
+  collector::TopDocs,
+  doc,
+  query::QueryParser,
+  schema::{Schema, SchemaBuilder, STORED, TEXT},
+  Document as TantivyDocument, Index,
+};
 
-#[test]
-fn test_search() {
-  let result = search_index(String::from("./tantivy_index"), String::from("搜索"));
-  println!("result is {:?}", result);
+/// 创建 schema，只在新建索引时使用
+fn build_schema() -> Schema {
+  let mut builder = SchemaBuilder::new();
+  builder.add_text_field("title", TEXT | STORED);
+  builder.add_text_field("body", TEXT | STORED);
+  builder.build()
 }
 
+/// 写入文档到 index
 #[napi]
-pub fn search_index(index_path: String, query_str: String) -> napi::Result<Vec<String>> {
-  let index = Index::open_in_dir(index_path).map_err(|e| Error::from_reason(e.to_string()))?;
+pub fn write_index(index_path: String, title: String, body: String) -> napi::Result<()> {
+  let path = std::path::Path::new(&index_path);
+  let schema;
 
-  let reader = index.reader().map_err(|e| Error::from_reason(e.to_string()))?;
-  reader.reload().map_err(|e| Error::from_reason(e.to_string()))?; // ✅ 关键
-
-  let searcher = reader.searcher();
-  let schema = index.schema();
-  println!("schema: {:?}", schema);
-  let default_fields = schema.fields().map(|(field, _)| field).collect::<Vec<_>>();
-  println!("default_fields: {:?}", default_fields);
-  let query_parser = QueryParser::for_index(&index, default_fields);
-  let query = query_parser
-      .parse_query(&query_str)
-      .map_err(|e| Error::from_reason(e.to_string()))?;
-
-  let top_docs = searcher
-      .search(&query, &TopDocs::with_limit(10))
-      .map_err(|e| Error::from_reason(e.to_string()))?;
-
-  let mut results = Vec::new();
-  for (_score, doc_address) in top_docs {
-    let compact_doc = searcher
-        .doc(doc_address)
-        .map_err(|e| Error::from_reason(e.to_string()))?;
-
-    let doc = TantivyDocument::from(compact_doc);
-    let json = doc.to_json(&schema);
-    results.push(json);
-  }
-
-  Ok(results)
-}
-
-
-// #[napi]
-// pub fn search_index(index_path: String, query_str: String) -> napi::Result<Vec<String>> {
-//   let index = Index::open_in_dir(index_path).map_err(|e| Error::from_reason(e.to_string()))?;
-//
-//   let reader = index
-//     .reader()
-//     .map_err(|e| Error::from_reason(e.to_string()))?;
-//   reader
-//     .reload()
-//     .map_err(|e| Error::from_reason(e.to_string()))?; // 👈 关键一步
-//   let searcher = reader.searcher();
-//
-//   let schema = index.schema();
-//   let default_fields = schema.fields().map(|(field, _)| field).collect::<Vec<_>>();
-//
-//   let query_parser = QueryParser::for_index(&index, default_fields);
-//   let query = query_parser
-//     .parse_query(&query_str)
-//     .map_err(|e| Error::from_reason(e.to_string()))?;
-//
-//   let top_docs = searcher
-//     .search(&query, &TopDocs::with_limit(10))
-//     .map_err(|e| Error::from_reason(e.to_string()))?;
-//
-//   println!("top_docs: {:?}", top_docs);
-//
-//   let mut results = Vec::new();
-//   for (_score, doc_address) in top_docs {
-//     let compact_doc = searcher
-//       .doc(doc_address)
-//       .map_err(|e| Error::from_reason(e.to_string()))?;
-//
-//     let doc = TantivyDocument::from(compact_doc);
-//     let json = doc.to_json(&schema);
-//     results.push(json);
-//   }
-//
-//   Ok(results)
-// }
-
-// #[napi]
-// pub fn search_index(index_path: String, query_str: String) -> napi::Result<Vec<String>> {
-//   let index = Index::open_in_dir(index_path).map_err(|e| Error::from_reason(e.to_string()))?;
-//
-//   let reader = index
-//     .reader()
-//     .map_err(|e| Error::from_reason(e.to_string()))?;
-//   let searcher = reader.searcher();
-//   let schema = index.schema();
-//   let default_fields = schema.fields().map(|(field, _)| field).collect::<Vec<_>>();
-//
-//   let query_parser = QueryParser::for_index(&index, default_fields);
-//   let query = query_parser
-//     .parse_query(&query_str)
-//     .map_err(|e| Error::from_reason(e.to_string()))?;
-//
-//   let top_docs = searcher
-//     .search(&query, &TopDocs::with_limit(10))
-//     .map_err(|e| Error::from_reason(e.to_string()))?;
-//
-//   let mut results = Vec::new();
-//   for (_score, doc_address) in top_docs {
-//     let compact_doc = searcher
-//       .doc(doc_address)
-//       .map_err(|e| Error::from_reason(e.to_string()))?;
-//
-//     let doc = TantivyDocument::from(compact_doc); // 👈 转为 Document
-//     let json = doc.to_json(&schema); // 👈 传入 schema
-//
-//     results.push(json);
-//   }
-//
-//   Ok(results)
-// }
-
-fn create_index(index_path: &str) -> tantivy::Result<()> {
-  let mut schema_builder = SchemaBuilder::new();
-  schema_builder.add_text_field("title", TEXT | STORED);
-  schema_builder.add_text_field("body", TEXT | STORED);
-  let schema = schema_builder.build();
-
-  let index = Index::create_in_dir(index_path, schema)?;
-  let mut index_writer = index.writer(50_000_000)?;
-
-  let title = index.schema().get_field("title").unwrap();
-  let body = index.schema().get_field("body").unwrap();
-
-  index_writer.add_document(doc!(
-      title => "Tantivy 中文搜索",
-      body => "这是一个基于 Rust 的全文本搜索引擎"
-  ))?;
-
-  index_writer.commit()?;
-  Ok(())
-}
-
-#[test]
-fn test_create_index() {
-  create_index("./tantivy_index").unwrap();
-}
-
-#[napi]
-pub fn write_index(index_path: String, title_str: String, body_str: String) -> napi::Result<()> {
-  // 创建 schema（或从已存在的 index 中读取）
-  let schema = if std::path::Path::new(&index_path).exists() {
-    let index = Index::open_in_dir(&index_path).map_err(|e| Error::from_reason(e.to_string()))?;
-    index.schema()
+  // 判断是否已存在 index
+  let index = if path.exists() {
+    let existing =
+      Index::open_in_dir(&path).map_err(|e| Error::from_reason(format!("打开索引失败: {}", e)))?;
+    schema = existing.schema();
+    existing
   } else {
-    let mut builder = SchemaBuilder::new();
-    builder.add_text_field("title", TEXT | STORED);
-    builder.add_text_field("body", TEXT | STORED);
-    builder.build()
+    schema = build_schema();
+    Index::create_in_dir(&path, schema.clone())
+      .map_err(|e| Error::from_reason(format!("创建索引失败: {}", e)))?
   };
-
-  // 打开或创建 Index
-  let index = if std::path::Path::new(&index_path).exists() {
-    Index::open_in_dir(&index_path).map_err(|e| Error::from_reason(e.to_string()))?
-  } else {
-    Index::create_in_dir(&index_path, schema.clone())
-      .map_err(|e| Error::from_reason(e.to_string()))?
-  };
-
-  // let title = schema.get_field("title").ok_or_else(|| Error::from_reason("Missing 'title' field"))?;
-  // let body = schema.get_field("body").ok_or_else(|| Error::from_reason("Missing 'body' field"))?;
-  let title = schema.get_field("title").unwrap();
-  let body = schema.get_field("body").unwrap();
 
   let mut writer = index
     .writer(50_000_000)
     .map_err(|e| Error::from_reason(e.to_string()))?;
 
-  writer.add_document(doc!(
-    title => title_str,
-    body => body_str
-  ));
+  let title_field = schema.get_field("title").unwrap();
+  let body_field = schema.get_field("body").unwrap();
+
+  writer
+    .add_document(doc!(title_field => title, body_field => body))
+    .map_err(|e| Error::from_reason(e.to_string()))?;
 
   writer
     .commit()
     .map_err(|e| Error::from_reason(e.to_string()))?;
-
   Ok(())
 }
 
-#[test]
-fn test_write_index() {
-  let result = write_index(
-    String::from("./tantivy_index"),
-    String::from("搜索测试"),
-    String::from("搜索内容文字"),
-  );
-  println!("result is {:?}", result);
+/// 查询索引
+#[napi]
+pub fn search_index(index_path: String, query_str: String) -> napi::Result<Vec<String>> {
+  let index = Index::open_in_dir(index_path).map_err(|e| Error::from_reason(e.to_string()))?;
+  let schema = index.schema();
 
-  let result = search_index(String::from("./tantivy_index"), String::from("搜索"));
-  println!("result is {:?}", result);
+  let reader = index
+    .reader()
+    .map_err(|e| Error::from_reason(e.to_string()))?;
+  reader
+    .reload()
+    .map_err(|e| Error::from_reason(e.to_string()))?;
+  let searcher = reader.searcher();
+
+  let default_fields = schema.fields().map(|(field, _)| field).collect::<Vec<_>>();
+
+  let query_parser = QueryParser::for_index(&index, default_fields);
+  let query = query_parser
+    .parse_query(&query_str)
+    .map_err(|e| Error::from_reason(e.to_string()))?;
+
+  let top_docs = searcher
+    .search(&query, &TopDocs::with_limit(10))
+    .map_err(|e| Error::from_reason(e.to_string()))?;
+
+  let mut results = Vec::new();
+
+  for (_score, doc_address) in top_docs {
+    let retrieved_doc: tantivy::TantivyDocument = searcher.doc(doc_address).unwrap();
+    let match_item = retrieved_doc.to_json(&schema);
+    results.push(match_item);
+    println!("{}", retrieved_doc.to_json(&schema));
+  }
+
+  Ok(results)
+}
+
+#[test]
+fn test_write() {
+  // write_index(
+  //   "./tantivy_index".to_owned(),
+  //   "The Old Man and the Sea".to_owned(),
+  //   "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone \
+  //        eighty-four days now without taking a fish."
+  //     .to_owned(),
+  // )
+  // .expect("TODO: panic message");
+
+  write_index(
+    "./tantivy_index".to_owned(),
+    "中文搜索试试".to_owned(),
+    "这是一段很长很长的中文啊."
+        .to_owned(),
+  )
+      .expect("TODO: panic message");
+}
+
+#[test]
+fn test_search() {
+  // let result = search_index("./tantivy_index".to_owned(), "Sea".to_owned());
+  // println!("{:#?}", result);
+
+
+  let result = search_index("./tantivy_index".to_owned(), "fished".to_owned());
+  println!("{:#?}", result);
 }
