@@ -69,12 +69,12 @@ fn setup_index(index_path: &str) -> tantivy::Result<(Index, Field, Field, Schema
   };
 
   // 测试分词
-  println!("--- Tokenizer Test ---");
-  let text = "中文搜索测试";
-  let mut token_stream = tokenizer.token_stream(text);
-  while token_stream.advance() {
-    println!("Token: {:?}", token_stream.token());
-  }
+  // println!("--- Tokenizer Test ---");
+  // let text = "中文搜索测试";
+  // let mut token_stream = tokenizer.token_stream(text);
+  // while token_stream.advance() {
+  //   println!("Token: {:?}", token_stream.token());
+  // }
 
   // 创建Schema
   let mut schema_builder = SchemaBuilder::new();
@@ -128,7 +128,7 @@ fn write_index(index_path: &str, title_data: &str, body_data: &str) -> tantivy::
   Ok(())
 }
 
-fn search_index(index_path: &str) -> tantivy::Result<Vec<String>> {
+fn search_index(index_path: &str, body_str: &str) -> tantivy::Result<Vec<String>> {
   let (index, title, body, schema) = setup_index(index_path)?;
 
   // 搜索
@@ -136,20 +136,82 @@ fn search_index(index_path: &str) -> tantivy::Result<Vec<String>> {
   let searcher = reader.searcher();
   println!("Total docs: {}", searcher.num_docs());
 
+  let default_fields = schema.fields().map(|(field, _)| field).collect::<Vec<_>>();
+  let query_parser = QueryParser::for_index(&index, default_fields);
+  let query = query_parser.parse_query(&body_str)?;
+  let top_docs = searcher.search(&query, &TopDocs::with_limit(10))?;
+  println!("top_docs: {:?}", top_docs);
+  let mut results = Vec::new();
+
+  for (_score, doc_address) in top_docs {
+    let retrieved_doc: tantivy::TantivyDocument = searcher.doc(doc_address).unwrap();
+    let match_item = retrieved_doc.to_json(&schema);
+    println!("{}", retrieved_doc.to_json(&schema));
+    results.push(match_item);
+  }
+  // println!("Default fields: {:?}", default_fields.clone());
+  // let query = query_parser
+  //   .parse_query(&body_str)
+  //   .map_err(|e| Error::from_reason(e.to_string()))
+  //   .unwrap();
+
   // 使用TermQuery对比
-  let term = Term::from_field_text(body, "分词");
-  let term_query = TermQuery::new(term, IndexRecordOption::Basic);
-  let term_top_docs = searcher.search(&term_query, &TopDocs::with_limit(10))?;
-  println!("Found {} docs with TermQuery", term_top_docs.len());
+  // let term = Term::from_field_text(body, body_str);
+  // let term_query = TermQuery::new(term, IndexRecordOption::Basic);
+  // let term_top_docs = searcher.search(&term_query, &TopDocs::with_limit(10))?;
+  // println!("Found {} docs with TermQuery", term_top_docs.len());
+  //
+  // let mut results = Vec::new();
+  // for (_score, doc_address) in term_top_docs {
+  //   let retrieved_doc: tantivy::TantivyDocument = searcher.doc(doc_address).unwrap();
+  //   let match_item = retrieved_doc.to_json(&schema);
+  //   results.push(match_item);
+  //   println!("{}", retrieved_doc.to_json(&schema));
+  // }
+  Ok(results)
+}
+
+fn search_index2(index_path: &str, query_str: String) -> tantivy::Result<Vec<String>> {
+  let (index, title, body, schema) = setup_index(index_path)?;
+  let schema = index.schema();
+
+  let reader = index
+    .reader()
+    .map_err(|e| Error::from_reason(e.to_string()))
+    .unwrap();
+  reader
+    .reload()
+    .map_err(|e| Error::from_reason(e.to_string()))
+    .unwrap();
+
+  let searcher = reader.searcher();
+  let default_fields = schema.fields().map(|(field, _)| field).collect::<Vec<_>>();
+  let query_parser = QueryParser::for_index(&index, default_fields);
+  let query = query_parser
+    .parse_query(&query_str)
+    .map_err(|e| Error::from_reason(e.to_string()))
+    .unwrap();
+
+  let top_docs = searcher
+    .search(&query, &TopDocs::with_limit(10))
+    .map_err(|e| Error::from_reason(e.to_string()))
+    .unwrap();
 
   let mut results = Vec::new();
-  for (_score, doc_address) in term_top_docs {
+
+  for (_score, doc_address) in top_docs {
     let retrieved_doc: tantivy::TantivyDocument = searcher.doc(doc_address).unwrap();
     let match_item = retrieved_doc.to_json(&schema);
     results.push(match_item);
-    println!("{}", retrieved_doc.to_json(&schema));
   }
+
   Ok(results)
+}
+
+#[test]
+fn test_write() {
+  let index_path = "./tantivy_index";
+  write_index(index_path, "全文解锁", "使用rust开发全文搜索功能").expect("TODO: panic message");
 }
 
 #[test]
@@ -161,9 +223,18 @@ fn search_index5() -> tantivy::Result<()> {
   // }
   let (index, title, body, schema) = setup_index(index_path)?;
 
-  let result = search_index(index_path);
-  println!("{:?}", result);
+  // let result = search_index(index_path, "分词");
+  // println!("{:?}", result);
+  // write_index(
+  //   index_path,
+  //   "The Old Man and the Sea",
+  //   "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone \
+  //        eighty-four days now without taking a fish..",
+  // )
+  // .expect("TODO: panic message");
 
+  let result = search_index(index_path, "全文搜索功能");
+  println!("{:?}", result);
   // write_index(index_path, "中文搜索测试", "中文搜索测试的body内容区域")
   //   .expect("TODO: panic message");
   // write_index(index_path, "中文搜索测试", "这是一个用Rust和Tantivy实现的全文搜索引擎，支持中文分词。")
