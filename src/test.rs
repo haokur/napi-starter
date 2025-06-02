@@ -123,6 +123,7 @@ fn search_index(index_path: &str, query_str: &str) -> tantivy::Result<Vec<String
   let fields = schema.fields().map(|(field, _)| field).collect::<Vec<_>>();
   let query_parser = QueryParser::for_index(&index, fields);
   let query = query_parser.parse_query(query_str)?;
+  println!("query: {:?}", query);
 
   let top_docs = searcher.search(&query, &TopDocs::with_limit(10))?;
 
@@ -135,6 +136,17 @@ fn search_index(index_path: &str, query_str: &str) -> tantivy::Result<Vec<String
     .collect();
 
   Ok(results)
+}
+
+
+#[test]
+fn setup_index_test(){
+  let index_path = "./tantivy_index";
+  let mut builder = SchemaBuilder::new();
+  builder.add_text_field("title", TEXT | STORED);
+  builder.add_text_field("body", TEXT | STORED);
+  let schema = builder.build();
+  Index::create_in_dir(&index_path, schema).unwrap();
 }
 
 #[test]
@@ -164,7 +176,10 @@ fn test_search() -> tantivy::Result<()> {
   let index_path = "./tantivy_index";
   // setup_index(index_path)?;
 
-  let result = search_index(index_path, "全文搜索功能");
+  // let result = search_index(index_path, "The Old Man and the Sea");
+  // let result = search_index(index_path, "全文");
+  let result = search_index(index_path, "全文解锁");
+
   println!("{:?}", result);
 
   Ok(())
