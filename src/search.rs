@@ -90,22 +90,22 @@ pub fn search_index(index_path: String, query_str: String) -> napi::Result<Vec<S
 
 #[test]
 fn test_write() {
-  // write_index(
-  //   "./tantivy_index".to_owned(),
-  //   "The Old Man and the Sea".to_owned(),
-  //   "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone \
-  //        eighty-four days now without taking a fish."
-  //     .to_owned(),
-  // )
-  // .expect("TODO: panic message");
-
   write_index(
     "./tantivy_index".to_owned(),
-    "中文搜索试试".to_owned(),
-    "这是一段很长很长的中文啊."
-        .to_owned(),
+    "The Old Man and the Sea".to_owned(),
+    "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone \
+         eighty-four days now without taking a fish."
+      .to_owned(),
   )
-      .expect("TODO: panic message");
+  .expect("TODO: panic message");
+
+  // write_index(
+  //   "./tantivy_index".to_owned(),
+  //   "中文搜索试试".to_owned(),
+  //   "这是一段很长很长的中文啊."
+  //       .to_owned(),
+  // )
+  //     .expect("TODO: panic message");
 }
 
 #[test]
