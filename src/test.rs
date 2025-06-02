@@ -160,7 +160,7 @@ fn clean_index() {
 }
 
 #[test]
-fn search_index5() -> tantivy::Result<()> {
+fn test_search() -> tantivy::Result<()> {
   let index_path = "./tantivy_index";
   // setup_index(index_path)?;
 
